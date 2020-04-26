@@ -25,8 +25,6 @@ ipa_transcript=false
 
 set -euo pipefail
 
-echo "Stage 0: Prepare GlobalPhone"
-
 all_gp_langs=""
 for l in $(cat <(echo ${gp_langs}) <(echo ${gp_recog}) | tr " " "\n" | sort -u); do
   all_gp_langs="${l} ${all_gp_langs}"
@@ -52,8 +50,11 @@ else
 fi
 
 # G2P pretrained models
-if [ ! -d g2ps ]; then
-  git clone https://github.com/uiuc-sst/g2ps
+if [ ! -d ../g2ps ]; then
+  git clone https://github.com/uiuc-sst/g2ps ../g2ps
+  pushd ../g2ps
+  git checkout 16274b48d6ff7938a32ddea1d89e41b91d9aa523  # freeze G2P models version
+  for f in models/*.fst.gz; do gunzip $f; done
 fi
 
 ipa_transcript_opt=
