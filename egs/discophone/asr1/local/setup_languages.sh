@@ -17,7 +17,7 @@ gp_path="/export/corpora5/GlobalPhone"
 gp_langs="Arabic Czech French Korean Mandarin Spanish Thai"
 gp_recog="Arabic Czech French Korean Mandarin Spanish Thai"
 mboshi_train=false
-mboshi_recog=true
+mboshi_recog=false
 gp_romanized=false
 ipa_transcript=false
 
