@@ -117,11 +117,7 @@ if $mboshi_train || $mboshi_recog; then
     utt, dur = line.strip().split()
     print(f'{utt} {utt} 0.00 {float(dur):.2f}')
 " > $data_dir/segments
-    python3 local/prepare_lexicons.py \
-      --lang Mboshi \
-      --data-dir $data_dir \
-      --g2p-models-dir ../g2ps/models \
-      $ipa_transcript_opt
+    # Note: normally there'd be prepare_lexicons.py call here, but Mboshi is allready transcribed in IPA
     utils/fix_data_dir.sh $data_dir
     utils/validate_data_dir.sh --no-feats $data_dir
   done
