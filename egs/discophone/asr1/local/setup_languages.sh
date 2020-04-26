@@ -101,7 +101,7 @@ fi
 
 # MBOSHI
 
-if [ $mboshi_train ] || [ $mboshi_recog ]; then
+if $mboshi_train || $mboshi_recog; then
   if [ ! -d ../mboshi-french-parallel-corpus ]; then
     git clone https://github.com/besacier/mboshi-french-parallel-corpus ../mboshi-french-parallel-corpus
   fi
