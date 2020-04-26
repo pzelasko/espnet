@@ -91,7 +91,7 @@ if [ "$gp_langs" ] || [ "$gp_recog" ]; then
       python3 local/prepare_lexicons.py \
         --lang $l \
         --data-dir $data_dir \
-        --g2p-models-dir g2ps/models \
+        --g2p-models-dir ../g2ps/models \
         $ipa_transcript_opt
       utils/fix_data_dir.sh $data_dir
       utils/validate_data_dir.sh --no-feats $data_dir
@@ -120,7 +120,7 @@ if [ $mboshi_train ] || [ $mboshi_recog ]; then
     python3 local/prepare_lexicons.py \
       --lang Mboshi \
       --data-dir $data_dir \
-      --g2p-models-dir g2ps/models \
+      --g2p-models-dir ../g2ps/models \
       $ipa_transcript_opt
     utils/fix_data_dir.sh $data_dir
     utils/validate_data_dir.sh --no-feats $data_dir
@@ -174,7 +174,7 @@ if [ "$langs" ] || [ "$recog" ]; then
         python3 local/prepare_lexicons.py \
           --lang $l \
           --data-dir $data_dir \
-          --g2p-models-dir g2ps/models \
+          --g2p-models-dir ../g2ps/models \
           $ipa_transcript_opt
         utils/fix_data_dir.sh $data_dir
       done
