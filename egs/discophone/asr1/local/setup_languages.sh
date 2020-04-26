@@ -55,6 +55,7 @@ if [ ! -d ../g2ps ]; then
   pushd ../g2ps
   git checkout 16274b48d6ff7938a32ddea1d89e41b91d9aa523  # freeze G2P models version
   for f in models/*.fst.gz; do gunzip $f; done
+  popd
 fi
 
 ipa_transcript_opt=

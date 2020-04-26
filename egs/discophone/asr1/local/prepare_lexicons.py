@@ -140,7 +140,7 @@ class LanguageNetLexicon:
     SYLLABLE_SEPARATOR = "."
     SPECIAL_TOKEN_RE = re.compile(r"<.+>")
 
-    def __init__(self, lexicon: Dict[str, List[str]]):
+    def __init__(self, lexicon: Dict[str, List[Phone]]):
         self.lexicon = lexicon
 
     @staticmethod
