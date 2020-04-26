@@ -38,7 +38,7 @@ def create_kaldi_data_dir(wavs: List[Path], dest: Path):
     ) as utt2spk:
         for idx, (wav, transcript) in enumerate(zip(wavs, transcripts)):
             utt_id = f"MBOSHI_AUDIO_{idx:04d}"
-            print(f"{utt_id} {wav}", file=wavscp)
+            print(f"{utt_id} cat {wav} |", file=wavscp)
             print(f"{utt_id} {transcript}", file=text)
             print(f"{utt_id} {utt_id}", file=utt2spk)
 
