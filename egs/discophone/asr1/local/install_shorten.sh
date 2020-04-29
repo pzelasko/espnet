@@ -17,5 +17,5 @@ wget http://shnutils.freeshell.org/shorten/dist/src/shorten-3.6.1.tar.gz
 tar xf shorten-3.6.1.tar.gz
 cd shorten-3.6.1
 ./configure
-make
+make 2>/dev/null
 

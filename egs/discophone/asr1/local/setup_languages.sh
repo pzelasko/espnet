@@ -76,7 +76,7 @@ if [ "$gp_langs" ] || [ "$gp_recog" ]; then
     --languages $all_gp_langs \
     $extra_args
 
-  for l in $gp_langs; do
+  for l in $all_gp_langs; do
     for split in train dev eval; do
       data_dir=data/GlobalPhone/gp_${l}_${split}
       echo "(GP) Processing: $data_dir"
