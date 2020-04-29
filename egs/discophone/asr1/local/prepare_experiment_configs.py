@@ -3,8 +3,12 @@ from pathlib import Path
 
 CONF_DIR = Path("conf/experiments")
 BABEL_LANGS_OF_INTEREST = frozenset("101 103 107 203 206 307 402 404".split())
+#GLOBALPHONE_LANGS_OF_INTEREST = frozenset(
+#    "Arabic Czech French Korean Mandarin Spanish Thai".split()
+#)
+# TODO: introduce Arabic and Korean in future experiments
 GLOBALPHONE_LANGS_OF_INTEREST = frozenset(
-    "Arabic Czech French Korean Mandarin Spanish Thai".split()
+    "Czech French Mandarin Spanish Thai".split()
 )
 
 CONF_TEMPLATE = """
@@ -72,7 +76,8 @@ for babel_lang in BABEL_LANGS_OF_INTEREST:
         BABEL_RECOG_LANGS=babel_lang,
         GLOBALPHONE_LANGS=" ".join(GLOBALPHONE_LANGS_OF_INTEREST),
         GLOBALPHONE_RECOG_LANGS="",
-        MBOSHI_TRAIN="true",
+        #MBOSHI_TRAIN="true",  # TODO: incorporate for later experiments
+        MBOSHI_TRAIN="false",
         MBOSHI_RECOG="false",
         USE_IPA="true",
     )
@@ -83,7 +88,8 @@ for gp_lang in GLOBALPHONE_LANGS_OF_INTEREST:
         BABEL_RECOG_LANGS="",
         GLOBALPHONE_LANGS=" ".join(GLOBALPHONE_LANGS_OF_INTEREST - {gp_lang}),
         GLOBALPHONE_RECOG_LANGS=gp_lang,
-        MBOSHI_TRAIN="true",
+        # MBOSHI_TRAIN="true",
+        MBOSHI_TRAIN="false",  # TODO: incorporate for later experiments
         MBOSHI_RECOG="false",
         USE_IPA="true",
     )
@@ -106,8 +112,11 @@ config = CONF_TEMPLATE.format(
     BABEL_RECOG_LANGS=" ".join(BABEL_LANGS_OF_INTEREST),
     GLOBALPHONE_LANGS=" ".join(GLOBALPHONE_LANGS_OF_INTEREST),
     GLOBALPHONE_RECOG_LANGS=" ".join(GLOBALPHONE_LANGS_OF_INTEREST),
-    MBOSHI_TRAIN="true",
-    MBOSHI_RECOG="true",
+    # TODO: incorporate for later experiments
+    #MBOSHI_TRAIN="true",
+    #MBOSHI_RECOG="true",
+    MBOSHI_TRAIN="false",
+    MBOSHI_RECOG="false",
     USE_IPA="true",
 )
 (CONF_DIR / f"all-ipa.conf").write_text(config)
