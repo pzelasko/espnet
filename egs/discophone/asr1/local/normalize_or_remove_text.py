@@ -28,13 +28,17 @@ parser.add_argument(
     action="store_true",
     help="Strip punctuation from utterances.",
 )
+parser.add_argument(
+    "--lowercase",
+    action='store_true',
+    help='Convert text to lowercase.'
+)
 
 args = parser.parse_args()
 text_path = Path(args.text)
 norm_text_path = text_path.with_suffix(".norm")
 
 remove_counter = 0
-norm_counter = 0
 with open(text_path) as fin, open(norm_text_path, "w") as fout:
     for idx, line in enumerate(fin):
         key, text = line.strip().split(maxsplit=1)
@@ -43,7 +47,8 @@ with open(text_path) as fin, open(norm_text_path, "w") as fout:
             continue
         if args.strip_punctuation:
             text = punctuation.sub("", text)
-            norm_counter += 1
+        if args.lowercase:
+            text = text.lower()
         print(key, text, file=fout)
 
 backup_path = text_path.with_suffix(".norm.bak")
@@ -51,7 +56,6 @@ move(text_path, backup_path)
 move(norm_text_path, text_path)
 
 print(
-    f"Inputs utts: {idx + 1} -- removed: {remove_counter} --"
-    f" normalized: {norm_counter}",
+    f"Inputs utts: {idx + 1} -- removed: {remove_counter}",
     file=stderr,
 )
