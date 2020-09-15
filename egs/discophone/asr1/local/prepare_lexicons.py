@@ -60,6 +60,11 @@ def main():
         action="store_true",
         help="Will save original text in text.bkp and save the IPA transcript to text.",
     )
+    parser.add_argument(
+        "-m",
+        "--merged-phn",
+        help="Will merge the diacritics and suprasegmentals with base phone token.",
+    )
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -107,11 +112,16 @@ def main():
         with text_bkp.open() as fin, text_ipa.open("w") as fout:
             for line in fin:
                 utt_id, *words = line.strip().split()
-                phonetic = ["".join(lexicon.transcribe(w)).strip() for w in words]
-                if not phonetic:
-                    continue  # skip empty utterances
-                print(utt_id, *[w for w in phonetic if w], file=fout)
-
+                if args.merged_phn == False:
+                    phonetic = ["".join(lexicon.transcribe(w)).strip() for w in words]
+                    if not phonetic:
+                        continue  # skip empty utterance
+                    print(utt_id, *[w for w in phonetic if w], file=fout)
+                else:
+                    phonetic = [" ".join(lexicon.transcribe(w)).strip() for w in words] # use this line for merged diacritics and suprasegmentals
+                    phonetic = [w for w in phonetic if w]
+                    out_list = " realspace ".join(phonetic)
+                    print(utt_id, out_list, file=fout)
         if args.substitute_text:
             shutil.copyfile(text_ipa, text)
 
@@ -128,6 +138,8 @@ class G2PModelProvider:
     def get(self, lang: str) -> str:
         if lang == "arabic":
             lang = "gulf-arabic"  # TODO: confirm that GlobalPhone has Gulf Arabic
+        if lang == "cantonese":
+            lang = "yue"  # TODO: confirm that GlobalPhone has Gulf Arabic
         return self.lang2fst[lang]
 
 
