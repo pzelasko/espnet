@@ -25,6 +25,7 @@ mboshi_train=false
 mboshi_recog=true
 gp_romanized=false
 ipa_transcript=false
+merged_phn=true
 
 . ./utils/parse_options.sh
 
@@ -95,6 +96,7 @@ if [ "$gp_langs" ] || [ "$gp_recog" ]; then
         --lang $l \
         --data-dir $data_dir \
         --g2p-models-dir g2ps/models \
+        --merged_phn $merged_phn \
         $ipa_transcript_opt
       utils/fix_data_dir.sh $data_dir
       utils/validate_data_dir.sh --no-feats $data_dir
@@ -124,6 +126,7 @@ if [ $mboshi_train ] || [ $mboshi_recog ]; then
       --lang Mboshi \
       --data-dir $data_dir \
       --g2p-models-dir g2ps/models \
+      --merged_phn $merged_phn \
       $ipa_transcript_opt
     utils/fix_data_dir.sh $data_dir
     utils/validate_data_dir.sh --no-feats $data_dir
@@ -178,6 +181,7 @@ for l in ${all_langs}; do
           --lang $l \
           --data-dir $data_dir \
           --g2p-models-dir g2ps/models \
+          --merged_phn $merged_phn \
           $ipa_transcript_opt
         utils/fix_data_dir.sh $data_dir
       done
@@ -194,6 +198,7 @@ for l in ${all_langs}; do
           --lang $l \
           --data-dir $data_dir \
           --g2p-models-dir g2ps/models \
+          --merged_phn $merged_phn \
           $ipa_transcript_opt
         utils/fix_data_dir.sh $data_dir
       done
