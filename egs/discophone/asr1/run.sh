@@ -8,6 +8,7 @@
 . ./cmd.sh || exit 1;
 
 # general configuration
+phone_tokens=false  # when true, it will use ['a', ':']; when false, it will use ['a:']
 backend=pytorch
 stage=0        # start from 0 if you need to start from data preparation
 stop_stage=100
@@ -57,7 +58,7 @@ else
   # Lao - 203
   babel_langs="307 103 101 402 107 206 505"
   babel_recog="${babel_langs} 404 203"
-  gp_langs="Arabic Czech French Korean Mandarin Spanish Thai"
+  gp_langs="Czech French Mandarin Spanish Thai"
   gp_recog="${gp_langs}"
   mboshi_train=false
   mboshi_recog=true
@@ -92,9 +93,20 @@ for l in ${babel_recog} ${gp_recog}; do
 done
 recog_set=${recog_set%% }
 
-if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
-  echo "stage 0: Setting up individual languages"
+phone_token_opt='--phones'
+if [ $phone_tokens = true ]; then
+  phone_token_opt='--phone-tokens'
+fi
 
+# This step will create the data directories for GlobalPhone and Babel languages.
+# It's also going to use LanguageNet G2P models to convert text into phonetic transcripts.
+# Depending on the settings, it will either transcribe into phones, e.g. ([m], [i:], [t]), or
+# phonetic tokens, e.g. (/m/, /i/, /:/, /t/).
+# The Kaldi "text" file will consist of these phonetic sequences, as we're trying to build
+# a universal IPA recognizer.
+# The lexicons are created separately for each split as an artifact from the ESPnet setup.
+if ((stage <= 0)); then
+  echo "stage 0: Setting up individual languages"
   local/setup_languages.sh \
     --langs "${babel_langs}" \
     --recog "${babel_recog}" \
@@ -103,11 +115,15 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     --mboshi-train "${mboshi_train}" \
     --mboshi-recog "${mboshi_recog}" \
     --gp-romanized "${gp_romanized}" \
-    --ipa-transcript "${ipa_transcript}"
-  for x in ${train_set} ${train_dev} ${recog_set}; do
-	  sed -i.bak -e "s/$/ sox -R -t wav - -t wav - rate 16000 dither | /" data/${x}/wav.scp
+    --gp-path "${gp_path}" \
+    --phone_token_opt "${phone_token_opt}" \
+    --multilang true
+  for x in ${train_set} ${dev_set} ${recog_set}; do
+    sed -i.bak -e "s/$/ sox -R -t wav - -t wav - rate 16000 dither | /" data/${x}/wav.scp
   done
 fi
+
+
 
 feat_tr_dir=${dumpdir}/${train_set}/delta${do_delta}; mkdir -p ${feat_tr_dir}
 feat_dt_dir=${dumpdir}/${train_dev}/delta${do_delta}; mkdir -p ${feat_dt_dir}

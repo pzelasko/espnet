@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Copyright 2020 Delft University of Technology (Siyuan Feng)
 # Copyright 2020 Johns Hopkins University (Piotr Żelasko)
 # Copyright 2018 Johns Hopkins University (Matthew Wiesner)
 #  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
@@ -7,24 +7,27 @@
 . ./path.sh
 . ./cmd.sh
 . ./conf/lang.conf
+. ./conf/corpora_paths.sh
 
 langs="101 102 103 104 105 106 202 203 204 205 206 207 301 302 303 304 305 306 401 402 403 505"
 recog="107 201 307 404"
 FLP=true
 
 # CGN related setups
-cgn=/home/jerome/Documents/20151207_CGN_2_0_3/CGN_2.0.3/		# point this to CGN
-lang="nl" # pointed to folder for Dutch spoken in Netherlands #
-comp="o" # pointed to 64hrs read speech #
+cgn=/home/jerome/Documents/20151207_CGN_2_0_3/CGN_2.0.3/ # point this to CGN
+lang="nl"                                                # pointed to folder for Dutch spoken in Netherlands #
+comp="o"                                                 # pointed to 64hrs read speech #
 
 # GlobalPhone related options
-gp_path="/export/corpora5/GlobalPhone"
+gp_path="$GLOBALPHONE_ROOT"
 gp_langs="Arabic Czech French Korean Mandarin Spanish Thai"
 gp_recog="Arabic Czech French Korean Mandarin Spanish Thai"
 mboshi_train=false
-mboshi_recog=true
+mboshi_recog=false
 gp_romanized=false
-ipa_transcript=false
+phone_token_opt="--phones"
+multilang=false # when true, will perform some vocabulary shenanigans (adding language suffixes)
+# to be able to merge word lexicons of different languages together
 
 . ./utils/parse_options.sh
 
@@ -46,9 +49,6 @@ echo "Languagues: ${all_gp_langs}"
 # Required for stripping Unicode punctuation
 pip install --user regex
 
-# We need this to decode GP audio format
-local/install_shorten.sh
-
 if command -v phonetisaurus-g2pfst; then
   echo "Phonetisaurus found!"
 else
@@ -59,11 +59,9 @@ fi
 # G2P pretrained models
 if [ ! -d g2ps ]; then
   git clone https://github.com/uiuc-sst/g2ps
-fi
-
-ipa_transcript_opt=
-if $ipa_transcript; then
-  ipa_transcript_opt="--substitute-text"
+  for i in g2ps/models/*.fst.gz; do
+    gunzip $i
+  done
 fi
 
 # GLOBALPHONE
@@ -73,6 +71,9 @@ if [ "$gp_langs" ] || [ "$gp_recog" ]; then
   if $gp_romanized; then
     extra_args="--romanized"
   fi
+  echo "gp_path is: "$gp_path
+  echo "all_gp_langs is: "$all_gp_langs
+  echo "extra_args is: "$extra_args
   python3 local/prepare_globalphone.py \
     --gp-path $gp_path \
     --output-dir data/GlobalPhone \
@@ -85,17 +86,27 @@ if [ "$gp_langs" ] || [ "$gp_recog" ]; then
       echo "(GP) Processing: $data_dir"
       python3 local/normalize_or_remove_text.py --strip-punctuation --remove-digit-utts $data_dir/text
       utils/fix_data_dir.sh $data_dir
-      utils/utt2spk_to_spk2utt.pl $data_dir/utt2spk > $data_dir/spk2utt
-      local/get_utt2dur.sh --read-entire-file true $data_dir
+      utils/utt2spk_to_spk2utt.pl $data_dir/utt2spk >$data_dir/spk2utt
+      local/get_utt2dur.sh --nj 8 --read-entire-file true $data_dir
       python3 -c "for line in open('$data_dir/utt2dur'):
       utt, dur = line.strip().split()
       print(f'{utt} {utt} 0.00 {float(dur):.2f}')
-  " > $data_dir/segments
+  " >$data_dir/segments
       python3 local/prepare_lexicons.py \
         --lang $l \
         --data-dir $data_dir \
         --g2p-models-dir g2ps/models \
-        $ipa_transcript_opt
+        $phone_token_opt -s
+      if $multilang; then
+        echo "adding text.bkp_suffix and lexicon_ipa_suffix.txt with language suffix"
+        echo "based on text.bkp and lexicon_ipa.txt"
+        echo "first is lexicon_ipa.txt, suffix is _${l}"
+        cut -d$'\t' -f1 $data_dir/lexicon_ipa.txt | sed "s/$/_${l}/g" >$data_dir/wordlist_suffix.list
+        cut -d$'\t' -f2- $data_dir/lexicon_ipa.txt | paste -d$'\t' $data_dir/wordlist_suffix.list - >$data_dir/lexicon_ipa_suffix.txt
+        echo "next is text.bkp: suffix is _${l}"
+        cut -d' ' -f2- $data_dir/text.bkp | sed "s/ \+/ /g" | sed "s/ /_${l} /g" | sed "s/$/_${l}/g" >$data_dir/text_suffix_no_uttid.bkp
+        cut -d' ' -f1 $data_dir/text.bkp | paste -d' ' - $data_dir/text_suffix_no_uttid.bkp >$data_dir/text.bkp_suffix
+      fi
       utils/fix_data_dir.sh $data_dir
       utils/validate_data_dir.sh --no-feats $data_dir
     done
@@ -104,7 +115,7 @@ fi
 
 # MBOSHI
 
-if [ $mboshi_train ] || [ $mboshi_recog ]; then
+if $mboshi_train || $mboshi_recog; then
   if [ ! -d ../mboshi-french-parallel-corpus ]; then
     git clone https://github.com/besacier/mboshi-french-parallel-corpus ../mboshi-french-parallel-corpus
   fi
@@ -114,17 +125,27 @@ if [ $mboshi_train ] || [ $mboshi_recog ]; then
   for split in train dev eval; do
     data_dir=data/Mboshi/Mboshi_${split}
     utils/fix_data_dir.sh $data_dir
-    utils/utt2spk_to_spk2utt.pl $data_dir/utt2spk > $data_dir/spk2utt
+    utils/utt2spk_to_spk2utt.pl $data_dir/utt2spk >$data_dir/spk2utt
     local/get_utt2dur.sh --read-entire-file true $data_dir
     python3 -c "for line in open('$data_dir/utt2dur'):
     utt, dur = line.strip().split()
     print(f'{utt} {utt} 0.00 {float(dur):.2f}')
-" > $data_dir/segments
+" >$data_dir/segments
     python3 local/prepare_lexicons.py \
       --lang Mboshi \
       --data-dir $data_dir \
       --g2p-models-dir g2ps/models \
-      $ipa_transcript_opt
+      $phone_token_opt -s
+    if $multilang; then
+      echo "adding text.bkp_suffix and lexicon_ipa_suffix.txt with language suffix"
+      echo "based on text.bkp and lexicon_ipa.txt"
+      echo "first is lexicon_ipa.txt, suffix is _${l}"
+      cut -d$'\t' -f1 $data_dir/lexicon_ipa.txt | sed "s/$/_${l}/g" >$data_dir/wordlist_suffix.list
+      cut -d$'\t' -f2- $data_dir/lexicon_ipa.txt | paste -d$'\t' $data_dir/wordlist_suffix.list - >$data_dir/lexicon_ipa_suffix.txt
+      echo "next is text.bkp: suffix is _${l}"
+      cut -d' ' -f2- $data_dir/text.bkp | sed "s/ \+/ /g" | sed "s/ /_${l} /g" | sed "s/$/_${l}/g" >$data_dir/text_suffix_no_uttid.bkp
+      cut -d' ' -f1 $data_dir/text.bkp | paste -d' ' - $data_dir/text_suffix_no_uttid.bkp >$data_dir/text.bkp_suffix
+    fi
     utils/fix_data_dir.sh $data_dir
     utils/validate_data_dir.sh --no-feats $data_dir
   done
@@ -153,52 +174,72 @@ if [ "$langs" ] || [ "$recog" ]; then
 
     ln -sf ${cwd}/local .
     for f in ${cwd}/{utils,steps,conf}; do
-      link=`make_absolute.sh $f`
+      link=$(make_absolute.sh $f)
       ln -sf $link .
     done
 
-  cp ${cwd}/cmd.sh .
-  cp ${cwd}/path.sh .
-  sed -i 's/\.\.\/\.\.\/\.\./\.\.\/\.\.\/\.\.\/\.\.\/\.\./g' path.sh
+    cp ${cwd}/cmd.sh .
+    cp ${cwd}/path.sh .
+    sed -i 's/\.\.\/\.\.\/\.\./\.\.\/\.\.\/\.\.\/\.\.\/\.\./g' path.sh
 
-  cd ${cwd}
-done
+    cd ${cwd}
+  done
 
-# Prepare language specific data
-for l in ${all_langs}; do
-  if [ ${l} -ne 505 ];then
-    (
-      cd data/${l}
-      ./local/prepare_data.sh --FLP ${FLP} ${l}
-      cd ${cwd}
-      for split in train dev eval; do
-        data_dir=data/${l}/data/${split}_${l}
-        python3 local/normalize_or_remove_text.py --strip-punctuation --remove-digit-utts $data_dir/text
-        python3 local/prepare_lexicons.py \
-          --lang $l \
-          --data-dir $data_dir \
-          --g2p-models-dir g2ps/models \
-          $ipa_transcript_opt
-        utils/fix_data_dir.sh $data_dir
-      done
-    ) &
-  else
-    (
-      cd data/${l}
-      ./local/cgn_data_prep.sh $cgn $lang $comp || exit 1;
-      cd ${cwd}
-      for split in train dev eval; do
-        data_dir=data/${l}/data/${split}_${l}
-        python3 local/normalize_or_remove_text.py --strip-punctuation --remove-digit-utts $data_dir/text
-        python3 local/prepare_lexicons.py \
-          --lang $l \
-          --data-dir $data_dir \
-          --g2p-models-dir g2ps/models \
-          $ipa_transcript_opt
-        utils/fix_data_dir.sh $data_dir
-      done
-    )&
-  fi
+  # Prepare language specific data
+  for l in ${all_langs}; do
+    if [ ${l} -ne 505 ]; then
+      (
+        cd data/${l}
+        ./local/prepare_data.sh --FLP ${FLP} ${l}
+        cd ${cwd}
+        for split in train dev eval; do
+          data_dir=data/${l}/data/${split}_${l}
+          python3 local/normalize_or_remove_text.py --strip-punctuation --remove-digit-utts $data_dir/text
+          python3 local/prepare_lexicons.py \
+            --lang $l \
+            --data-dir $data_dir \
+            --g2p-models-dir g2ps/models \
+            $phone_token_opt -s
+          if $multilang; then
+            echo "adding text.bkp_suffix and lexicon_ipa_suffix.txt with language suffix"
+            echo "based on text.bkp and lexicon_ipa.txt"
+            echo "first is lexicon_ipa.txt, suffix is _${l}"
+            cut -d$'\t' -f1 $data_dir/lexicon_ipa.txt | sed "s/$/_${l}/g" >$data_dir/wordlist_suffix.list
+            cut -d$'\t' -f2- $data_dir/lexicon_ipa.txt | paste -d$'\t' $data_dir/wordlist_suffix.list - >$data_dir/lexicon_ipa_suffix.txt
+            echo "next is text.bkp: suffix is _${l}"
+            cut -d' ' -f2- $data_dir/text.bkp | sed "s/ \+/ /g" | sed "s/ /_${l} /g" | sed "s/$/_${l}/g" >$data_dir/text_suffix_no_uttid.bkp
+            cut -d' ' -f1 $data_dir/text.bkp | paste -d' ' - $data_dir/text_suffix_no_uttid.bkp >$data_dir/text.bkp_suffix
+          fi
+          utils/fix_data_dir.sh $data_dir
+        done
+      )
+    else
+      (
+        cd data/${l}
+        ./local/cgn_data_prep.sh $cgn $lang $comp || exit 1
+        cd ${cwd}
+        for split in train dev eval; do
+          data_dir=data/${l}/data/${split}_${l}
+          python3 local/normalize_or_remove_text.py --strip-punctuation --remove-digit-utts $data_dir/text
+          python3 local/prepare_lexicons.py \
+            --lang $l \
+            --data-dir $data_dir \
+            --g2p-models-dir g2ps/models \
+            $phone_token_opt -s
+          if $multilang; then
+            echo "adding text.bkp_suffix and lexicon_ipa_suffix.txt with language suffix"
+            echo "based on text.bkp and lexicon_ipa.txt"
+            echo "first is lexicon_ipa.txt, suffix is _${l}"
+            cut -d$'\t' -f1 $data_dir/lexicon_ipa.txt | sed "s/$/_${l}/g" >$data_dir/wordlist_suffix.list
+            cut -d$'\t' -f2- $data_dir/lexicon_ipa.txt | paste -d$'\t' $data_dir/wordlist_suffix.list - >$data_dir/lexicon_ipa_suffix.txt
+            echo "next is text.bkp: suffix is _${l}"
+            cut -d' ' -f2- $data_dir/text.bkp | sed "s/ \+/ /g" | sed "s/ /_${l} /g" | sed "s/$/_${l}/g" >$data_dir/text_suffix_no_uttid.bkp
+            cut -d' ' -f1 $data_dir/text.bkp | paste -d' ' - $data_dir/text_suffix_no_uttid.bkp >$data_dir/text.bkp_suffix
+          fi
+          utils/fix_data_dir.sh $data_dir
+        done
+      )
+    fi
   done
   wait
 fi
@@ -217,7 +258,7 @@ done
 
 # Now Mboshi
 
-if [ $mboshi_train ]; then
+if $mboshi_train; then
   train_dirs="data/Mboshi/Mboshi_train ${train_dirs}"
   dev_dirs="data/Mboshi/Mboshi_dev ${dev_dirs}"
 fi
@@ -241,7 +282,7 @@ for l in ${recog}; do
   fi
 done
 
-if [ $mboshi_recog ]; then
+if $mboshi_recog; then
   target_link="data/Mboshi/Mboshi_eval"
   if [ ! -L $target_link ]; then
     ln -s ${cwd}/data/Mboshi/Mboshi_eval $target_link

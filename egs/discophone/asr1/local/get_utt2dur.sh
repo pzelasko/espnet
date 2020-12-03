@@ -33,20 +33,20 @@ export LC_ALL=C
 
 data=$1
 
-if [ -s $data/utt2dur ] && \
-  [ $(wc -l < $data/utt2spk) -eq $(wc -l < $data/utt2dur) ]; then
+if [ -s $data/utt2dur ] &&
+  [ $(wc -l <$data/utt2spk) -eq $(wc -l <$data/utt2dur) ]; then
   echo "$0: $data/utt2dur already exists with the expected length.  We won't recompute it."
-  exit 0;
+  exit 0
 fi
 
 if [ -s $data/segments ]; then
   echo "$0: working out $data/utt2dur from $data/segments"
-  awk '{len=$4-$3; print $1, len;}' < $data/segments  > $data/utt2dur
+  awk '{len=$4-$3; print $1, len;}' <$data/segments >$data/utt2dur
 elif [[ -s $data/frame_shift && -f $data/utt2num_frames ]]; then
   echo "$0: computing $data/utt2dur from $data/{frame_shift,utt2num_frames}."
   frame_shift=$(cat $data/frame_shift) || exit 1
   # The 1.5 correction is the typical value of (frame_length-frame_shift)/frame_shift.
-  awk -v fs=$frame_shift '{ $2=($2+1.5)*fs; print }' <$data/utt2num_frames  >$data/utt2dur
+  awk -v fs=$frame_shift '{ $2=($2+1.5)*fs; print }' <$data/utt2num_frames >$data/utt2dur
 elif [ -f $data/wav.scp ]; then
   echo "$0: segments file does not exist so getting durations from wave files"
 
@@ -72,13 +72,13 @@ elif [ -f $data/wav.scp ]; then
              }
              $duration = $sample_count * 1.0 / $sample_rate;
              print "$utt $duration\n";
-     } ' > $data/utt2dur; then
+     } ' >$data/utt2dur; then
     echo "$0: successfully obtained utterance lengths from sphere-file headers"
   else
     echo "$0: could not get utterance lengths from sphere-file headers, using wav-to-duration"
     if ! command -v wav-to-duration >/dev/null; then
-      echo  "$0: wav-to-duration is not on your path"
-      exit 1;
+      echo "$0: wav-to-duration is not on your path"
+      exit 1
     fi
 
     if grep -q 'sox.*speed' $data/wav.scp; then
@@ -87,7 +87,6 @@ elif [ -f $data/wav.scp ]; then
       echo "... It is much faster if you call get_utt2dur.sh *before* doing the speed perturbation via e.g. perturb_data_dir_speed.sh or "
       echo "... perturb_data_dir_speed_3way.sh."
     fi
-
 
     num_utts=$(wc -l <$data/utt2spk)
     if [ $nj -gt $num_utts ]; then
@@ -99,12 +98,15 @@ elif [ -f $data/wav.scp ]; then
 
     $cmd JOB=1:$nj $data/log/get_durations.JOB.log \
       wav-to-duration --read-entire-file=$read_entire_file \
-      scp:$sdata/JOB/wav.scp ark,t:$sdata/JOB/utt2dur || \
-        { echo "$0: there was a problem getting the durations"; exit 1; }
+      scp:$sdata/JOB/wav.scp ark,t:$sdata/JOB/utt2dur ||
+      {
+        echo "$0: there was a problem getting the durations"
+        exit 1
+      }
 
-    for n in `seq $nj`; do
+    for n in $(seq $nj); do
       cat $sdata/$n/utt2dur
-    done > $data/utt2dur
+    done >$data/utt2dur
   fi
 elif [ -f $data/feats.scp ]; then
   echo "$0: wave file does not exist so getting durations from feats files"
@@ -120,11 +122,11 @@ else
   exit 1
 fi
 
-len1=$(wc -l < $data/utt2spk)
-len2=$(wc -l < $data/utt2dur)
+len1=$(wc -l <$data/utt2spk)
+len2=$(wc -l <$data/utt2dur)
 if [ "$len1" != "$len2" ]; then
   echo "$0: warning: length of utt2dur does not equal that of utt2spk, $len2 != $len1"
-  if [ $len1 -gt $[$len2*2] ]; then
+  if [ $len1 -gt $(($len2 * 2)) ]; then
     echo "$0: less than half of utterances got a duration: failing."
     exit 1
   fi
