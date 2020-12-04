@@ -115,7 +115,6 @@ if ((stage <= 0)); then
     --mboshi-train "${mboshi_train}" \
     --mboshi-recog "${mboshi_recog}" \
     --gp-romanized "${gp_romanized}" \
-    --gp-path "${gp_path}" \
     --phone_token_opt "${phone_token_opt}" \
     --multilang true
   for x in ${train_set} ${dev_set} ${recog_set}; do
