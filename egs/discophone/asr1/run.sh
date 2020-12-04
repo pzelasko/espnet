@@ -131,7 +131,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
   fbankdir=fbank
   # Generate the fbank features; by default 80-dimensional fbanks with pitch on each frame
   for x in ${train_set} ${train_dev} ${recog_set}; do
-    steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj 30 --write_utt2num_frames true \
+    steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj 80 --write_utt2num_frames true \
         data/${x} exp/make_fbank/${x} ${fbankdir}
     utils/fix_data_dir.sh data/${x}
   done
@@ -172,6 +172,11 @@ fi
 dict=data/lang_1char/${train_set}_units.txt
 nlsyms=data/lang_1char/non_lang_syms.txt
 
+trans_type="phn"
+if $phone_tokens; then
+    trans_type="char"
+fi
+
 echo "dictionary: ${dict}"
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     ### Task dependent. You have to check non-linguistic symbols used in the corpus.
@@ -186,7 +191,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 
     echo "make a dictionary"
     echo "<unk> 1" > ${dict} # <unk> must be 1, 0 will be used for "blank" in CTC
-    text2token.py -s 1 -n 1 -l ${nlsyms} data/${train_set}/text | cut -f 2- -d" " | tr " " "\n" \
+    text2token.py -t ${trans_type} -s 1 -n 1 -l ${nlsyms} data/${train_set}/text | cut -f 2- -d" " | tr " " "\n" \
     | sort | uniq | grep -v -e '^\s*$' | grep -v '<unk>' | awk '{print $0 " " NR+1}' >> ${dict}
     wc -l ${dict}
 
@@ -208,13 +213,15 @@ if ${use_lm}; then
   lm_valid_set=data/local/dev.txt
 
   # Make train and valid
-  text2token.py --nchar 1 \
+  text2token.py -t ${trans_type} \
+                 --nchar 1 \
                 --space "<space>" \
                 --non-lang-syms data/lang_1char/non_lang_syms.txt \
                 <(cut -d' ' -f2- data/${train_set}/text | head -100) \
                 > ${lm_train_set}
 
-  text2token.py --nchar 1 \
+  text2token.py -t ${trans_type} \
+                --nchar 1 \
                 --space "<space>" \
                 --non-lang-syms data/lang_1char/non_lang_syms.txt \
                 <(cut -d' ' -f2- data/${train_dev}/text | head -100) \

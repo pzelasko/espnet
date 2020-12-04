@@ -28,10 +28,17 @@ parser.add_argument(
     action="store_true",
     help="Strip punctuation from utterances.",
 )
+parser.add_argument(
+    "--oov-filter",
+    action="store_true",
+    help="Change most of <> symbols to <unk>"
+)
 
 args = parser.parse_args()
 text_path = Path(args.text)
 norm_text_path = text_path.with_suffix(".norm")
+
+special = re.compile(r"<[^>]+>")
 
 remove_counter = 0
 norm_counter = 0
@@ -41,9 +48,17 @@ with open(text_path) as fin, open(norm_text_path, "w") as fout:
         if args.remove_digit_utts and number.search(text):
             remove_counter += 1
             continue
+        normed = False
         if args.strip_punctuation:
             text = punctuation.sub("", text)
-            norm_counter += 1
+            normed = True
+        if args.oov_filter:
+            syms = set(special.findall(text))
+            for sym in syms:
+                if sym not in {'<silence>', '<noise>', '<v-noise>'}:
+                    text = text.replace(sym, '<unk>')
+            normed = True
+        norm_counter += int(normed)
         print(key, text, file=fout)
 
 backup_path = text_path.with_suffix(".norm.bak")
