@@ -117,7 +117,7 @@ if ((stage <= 0)); then
     --gp-romanized "${gp_romanized}" \
     --phone_token_opt "${phone_token_opt}" \
     --multilang true
-  for x in ${train_set} ${dev_set} ${recog_set}; do
+  for x in ${train_set} ${train_dev} ${recog_set}; do
     sed -i.bak -e "s/$/ sox -R -t wav - -t wav - rate 16000 dither | /" data/${x}/wav.scp
   done
 fi

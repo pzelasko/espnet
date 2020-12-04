@@ -64,6 +64,8 @@ if [ ! -d g2ps ]; then
   done
 fi
 
+local/install_shorten.sh
+
 # GLOBALPHONE
 
 if [ "$gp_langs" ] || [ "$gp_recog" ]; then
