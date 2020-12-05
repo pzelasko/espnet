@@ -8,6 +8,7 @@
 . ./cmd.sh || exit 1;
 
 # general configuration
+phone_tokens=false  # when true, it will use ['a', ':']; when false, it will use ['a:']
 backend=pytorch
 stage=0        # start from 0 if you need to start from data preparation
 stop_stage=100
@@ -57,7 +58,7 @@ else
   # Lao - 203
   babel_langs="307 103 101 402 107 206 505"
   babel_recog="${babel_langs} 404 203"
-  gp_langs="Arabic Czech French Korean Mandarin Spanish Thai"
+  gp_langs="Czech French Mandarin Spanish Thai"
   gp_recog="${gp_langs}"
   mboshi_train=false
   mboshi_recog=true
@@ -92,9 +93,20 @@ for l in ${babel_recog} ${gp_recog}; do
 done
 recog_set=${recog_set%% }
 
-if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
-  echo "stage 0: Setting up individual languages"
+phone_token_opt='--phones'
+if [ $phone_tokens = true ]; then
+  phone_token_opt='--phone-tokens'
+fi
 
+# This step will create the data directories for GlobalPhone and Babel languages.
+# It's also going to use LanguageNet G2P models to convert text into phonetic transcripts.
+# Depending on the settings, it will either transcribe into phones, e.g. ([m], [i:], [t]), or
+# phonetic tokens, e.g. (/m/, /i/, /:/, /t/).
+# The Kaldi "text" file will consist of these phonetic sequences, as we're trying to build
+# a universal IPA recognizer.
+# The lexicons are created separately for each split as an artifact from the ESPnet setup.
+if ((stage <= 0)); then
+  echo "stage 0: Setting up individual languages"
   local/setup_languages.sh \
     --langs "${babel_langs}" \
     --recog "${babel_recog}" \
@@ -103,11 +115,14 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     --mboshi-train "${mboshi_train}" \
     --mboshi-recog "${mboshi_recog}" \
     --gp-romanized "${gp_romanized}" \
-    --ipa-transcript "${ipa_transcript}"
+    --phone_token_opt "${phone_token_opt}" \
+    --multilang true
   for x in ${train_set} ${train_dev} ${recog_set}; do
-	  sed -i.bak -e "s/$/ sox -R -t wav - -t wav - rate 16000 dither | /" data/${x}/wav.scp
+    sed -i.bak -e "s/$/ sox -R -t wav - -t wav - rate 16000 dither | /" data/${x}/wav.scp
   done
 fi
+
+
 
 feat_tr_dir=${dumpdir}/${train_set}/delta${do_delta}; mkdir -p ${feat_tr_dir}
 feat_dt_dir=${dumpdir}/${train_dev}/delta${do_delta}; mkdir -p ${feat_dt_dir}
@@ -116,7 +131,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
   fbankdir=fbank
   # Generate the fbank features; by default 80-dimensional fbanks with pitch on each frame
   for x in ${train_set} ${train_dev} ${recog_set}; do
-    steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj 30 --write_utt2num_frames true \
+    steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj 80 --write_utt2num_frames true \
         data/${x} exp/make_fbank/${x} ${fbankdir}
     utils/fix_data_dir.sh data/${x}
   done
@@ -157,6 +172,11 @@ fi
 dict=data/lang_1char/${train_set}_units.txt
 nlsyms=data/lang_1char/non_lang_syms.txt
 
+trans_type="phn"
+if $phone_tokens; then
+    trans_type="char"
+fi
+
 echo "dictionary: ${dict}"
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     ### Task dependent. You have to check non-linguistic symbols used in the corpus.
@@ -171,7 +191,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 
     echo "make a dictionary"
     echo "<unk> 1" > ${dict} # <unk> must be 1, 0 will be used for "blank" in CTC
-    text2token.py -s 1 -n 1 -l ${nlsyms} data/${train_set}/text | cut -f 2- -d" " | tr " " "\n" \
+    text2token.py -t ${trans_type} -s 1 -n 1 -l ${nlsyms} data/${train_set}/text | cut -f 2- -d" " | tr " " "\n" \
     | sort | uniq | grep -v -e '^\s*$' | grep -v '<unk>' | awk '{print $0 " " NR+1}' >> ${dict}
     wc -l ${dict}
 
@@ -193,13 +213,15 @@ if ${use_lm}; then
   lm_valid_set=data/local/dev.txt
 
   # Make train and valid
-  text2token.py --nchar 1 \
+  text2token.py -t ${trans_type} \
+                 --nchar 1 \
                 --space "<space>" \
                 --non-lang-syms data/lang_1char/non_lang_syms.txt \
                 <(cut -d' ' -f2- data/${train_set}/text | head -100) \
                 > ${lm_train_set}
 
-  text2token.py --nchar 1 \
+  text2token.py -t ${trans_type} \
+                --nchar 1 \
                 --space "<space>" \
                 --non-lang-syms data/lang_1char/non_lang_syms.txt \
                 <(cut -d' ' -f2- data/${train_dev}/text | head -100) \
