@@ -3,13 +3,11 @@
 # Apache 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 import re
 import shutil
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from itertools import chain
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from pathlib import Path
-from subprocess import run, PIPE, DEVNULL
+from subprocess import DEVNULL, PIPE, run
 from tempfile import NamedTemporaryFile
-
-from typing import List, Dict
+from typing import Dict, List
 
 BABELCODE2LANG = {
     "101": "Cantonese",
@@ -68,7 +66,8 @@ def main():
         "--phones",
         action="store_true",
         help="Instead of concatenating phones to form 'phonetic words', "
-             "will create text with whitespace-separated phone sequences",
+             "will create text with whitespace-separated phone sequences, with a special token"
+             "'sil' inserted at word boundaries. Will rename <silence> to 'sil' as well.",
     )
     parser.add_argument(
         "-t",
@@ -127,16 +126,17 @@ def main():
         with text_bkp.open() as fin, text_ipa.open("w") as fout:
             for line in fin:
                 utt_id, *words = line.strip().split()
-                phonetic = chain.from_iterable((p.strip() for p in lexicon.transcribe(w)) for w in words)
+                phonetic = [[p.strip() for p in lexicon.transcribe(w)] for w in words]
                 if args.phones:
-                    phonetic = list(phonetic)
+                    phonetic = " sil ".join(" ".join(phones) for phones in phonetic)
                 elif args.phone_tokens:
-                    phonetic = list("".join(phonetic))
+                    phonetic = " ".join(phonetic)
                 else:
-                    phonetic = ["".join(lexicon.transcribe(w)).strip() for w in words]
+                    phonetic = " ".join("".join(lexicon.transcribe(w)).strip() for w in words)
                 if not phonetic:
                     continue  # skip empty utterances
-                print(utt_id, *[w for w in phonetic if w], file=fout)
+                print(phonetic)
+                print(utt_id, phonetic, file=fout)
 
         if args.substitute_text:
             shutil.copyfile(text_ipa, text)
