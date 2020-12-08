@@ -128,14 +128,14 @@ def main():
                 utt_id, *words = line.strip().split()
                 phonetic = [[p.strip() for p in lexicon.transcribe(w)] for w in words]
                 if args.phones:
-                    phonetic = " sil ".join(" ".join(phones) for phones in phonetic)
+                    phonetic = " sil ".join(" ".join(p if p != '<silence>' else 'sil' for p in phones) for phones in phonetic)
+                    phonetic = phonetic.replace('sil sil', 'sil').replace('sil sil', 'sil')
                 elif args.phone_tokens:
                     phonetic = " ".join(phonetic)
                 else:
                     phonetic = " ".join("".join(lexicon.transcribe(w)).strip() for w in words)
                 if not phonetic:
                     continue  # skip empty utterances
-                print(phonetic)
                 print(utt_id, phonetic, file=fout)
 
         if args.substitute_text:
